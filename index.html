@@ -2,17 +2,37 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Spec proposal</title>
-    <script src="https://www.w3.org/Tools/respec/respec-w3c" class="remove"></script>
-    <script class='remove'>
+    <title>JSON-LD 1.1 in CBOR</title>
+    <script src="https://www.w3.org/Tools/respec/respec-w3c-common" class="remove"></script>
+    <script type="text/javascript" src="common/common.js" class="remove" defer></script>
+    <script type="text/javascript" src="common/jsonld.js" class="remove"></script>
       // See https://github.com/w3c/respec/wiki/ for how to configure ReSpec
-      var respecConfig = {
-        specStatus: "CG-DRAFT",
-        shortName: "json-ld-cbor",
-        editors: [{
-          name: "Ivan Herman"
-        }]
-      };
+    <script class='remove'>
+        var respecConfig = {
+            localBiblio:       jsonld.localBiblio,
+            specStatus:        "ED",
+            copyrightStart:    "2019",
+            shortName:         "json-ld-cbor",
+            github:            "https://github.com/w3c/json-ld-cbor/",
+            edDraftURI:        "https://w3c.github.io/json-ld-cbor/",
+            includePermalinks: true,
+            doJsonLd:          true,
+            pluralize:         true,
+            editors: [{
+                name: "Somebody..."
+            }],
+            // name of the WG
+            wg:                "JSON-LD Working Group",
+
+            // URI of the public WG page
+            wgURI:             "https://www.w3.org/2018/json-ld-wg/",
+
+            // name (with the @w3c.org) of the public mailing to which comments are due
+            wgPublicList:       "public-json-ld-wg",
+            processVersion:     2018,
+            maxTocLevel:        4,
+            noRecTrack:         "true"
+        };
     </script>
   </head>
   <body>
