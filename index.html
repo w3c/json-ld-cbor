@@ -38,7 +38,7 @@
   <body>
     <section id="abstract">
       <p>
-        This specification does neat stuff.
+        TODO in the end
       </p>
     </section>
     <section id="sotd">
@@ -47,12 +47,288 @@
       </p>
     </section>
 
-    <section id="introduction">
+    <section id="introduction" data-cite="JSON-LD11">
       <h2>Introduction</h2>
+      <!--
+        <p>
+          See <a href="https://github.com/w3c/respec/wiki/User's-Guide">ReSpec's user guide</a>
+          for how to get started!
+        </p>
+      -->
       <p>
-        See <a href="https://github.com/w3c/respec/wiki/User's-Guide">ReSpec's user guide</a>
-        for how toget started!
+        The [[[RFC7049]]] [[RFC7049]] is a data format for constrained environments.
+        It is designed to be processable with small code, and to produce small messages.
+        Its underlying data model is an extension of the
+        <a data-cite="RFC8259#" data-no-xref="">JSON</a> data model [[RFC8259]].
+        That makes it an possible format to transport JSON-LD documents,
+        in constrained contexts such as, e.g., the Web of Things.
+        It also allows JSON-LD <a data-cite="JSON-LD11#dfn-context">contexts</a> to be used to provide a layer of semantics on existing CBOR data.
       </p>
+      <p>
+        More specifically, this note specifies how to convert between the
+        <a data-cite="RFC7049#">CBOR</a> data format and the
+        <a href="JSON-LD11#dfn-internal-representation">JSON-LD internal representation</a>
+        (a is straightforward abstraction of the JSON format<span style="display: none">
+          using the following terms,
+          which are only included here to please ReSpec, but should not be displayed:
+          <dfn data-cite="INFRA#list" class="preserve">array</dfn>,
+          <dfn data-cite="INFRA#boolean" class="preserve">boolean</dfn>,
+          <dfn data-cite="INFRA#ordered-map" class="preserve">map</dfn>,
+          <dfn data-cite="INFRA#map-entry" data-lt="map entry|entry" data-ld-noDefault class="preserve">entries</dfn>,
+          <dfn data-cite="INFRA#nulls" class="preserve">null</dfn>,
+          <dfn data-cite="ECMASCRIPT#sec-terms-and-definitions-number-value" data-lt="number|JSON number" class="preserve">number</dfn>,
+          <dfn data-cite="WEBIDL#idl-long" class="preserve">long</dfn>,
+          <dfn data-cite="WEBIDL#idl-double" class="preserve">double</dfn>,
+          <dfn data-cite="INFRA#primitive-data-types" class="preserve">scalar</dfn>,
+          <dfn data-cite="INFRA#javascript-string" class="preserve">string</dfn>
+        </span>).
+        Since CBOR emphasizes small messages,
+        we also propose a number of techniques for reducing the size of messages.
+      </p>
+      <p>
+        To understand this note you must be familiar both the 
+        <a data-cite="RFC8259" data-no-xref="">JSON</a> format [[RFC8259]] and the
+        <a data-cite="RFC7049" data-no-xref="">CBOR</a> format [[RFC7049]].
+        You must also understand the basics of 
+        <a data-cite="JSON-LD11" data-no-xref="">JSON-LD 1.1</a> [[JSON-LD11]].
+      </p>
+  </section>
+  <section id="serialize">
+    <h2>Serializing JSON-LD to CBOR</h2>
+    <p>While being generally based on the
+      <a data-cite="RFC8259#">JSON</a> data model,
+      the <a data-cite="RFC7049#">CBOR</a>
+      specification does not specify a standard conversion between both models.
+      This is due in part to the fact that the
+      <a data-cite="RFC7049#">CBOR</a> model is an extension of the former.
+      In this section, we provide a complete specification of such a conversion,
+      following the guidelines from <a data-cite="RFC7049#section-4.2">§4.2 of RFC7049</a>,
+      and taking into account the particularities of <a data-cite="JSON-LD11#">JSON-LD</a>.
+    </p>
+    <ul>
+      <li id="serialize-null-bool">
+        <a>Null</a> and <a>boolean</a> values are serialized with major type 7,
+        and additional type value 22 for `null`, 20 for `false` and 21 for `true`.
+      </li>
+      <li id="serialize-int">
+        <a>Numbers</a> without a fractional part (integer numbers)
+        are serialized as CBOR integers (major types 0 and 1),
+        choosing the shortest form.
+      </li>
+      <li id="serialize-float">
+        <a>Numbers</a> with a fractional part are serialized as CBOR floating-point values
+        (major type 7, and additional type value from 25 to 27). 
+        Preferably,
+        the shortest exact floating-point representation is used;
+        for instance, 1.5 is represented in a 16-bit floating-point value
+        (not all implementations will be capable of efficiently finding the minimum form, though).
+      </li>
+      <li id="serialize-string">
+        <a>Strings</a> are serialized as CBOR UTF-8 strings
+        (major type 3).
+        Note that, unlike JSON,
+        CBOR does not require any escaping in strings,
+        so all escape codes (if any)
+        present in the JSON source must be replaced beforehand by their corresponding character.
+      </li>
+      <li id="serialize-array">
+        <a>Arrays</a> are serialized as CBOR arrays (major type 4),
+        and their items are serialized by applying these rules recursively.
+      </li>
+      <li id="serialize-object">
+        <a data-cite="RFC8259#section-4">JSON objects</a>,
+        are internally represented as <a>maps</a> in JSON-LD,
+        and are generally serialized as CBOR maps (major type 5).
+        All keys are strings, and are serialized as above;
+        all values are serialized by applying these rules recursively.
+        There are however a few exceptions described below,
+        to take into account their specific meaning in JSON-LD:
+        <ul>
+          <li>
+            If the object is a
+            <a data-cite="JSON-LD11#dfn-value-object">value object</a>
+            with a `@type` of `xsd:integer` (TODO full IRI),
+            an if its `@value` is a valid decimal representation of an integer,
+            then the object is serialized as a CBOR integer (major type 0 or 1)
+            choosing the shortest form.
+          </li>
+          <li>
+            If the object is a
+            <a data-cite="JSON-LD11#dfn-value-object">value object</a>
+            with a `@type` of `xsd:base64Binary` (TODO full IRI),
+            an if its `@value` complies with the 
+            <a data-cite="XSD#base64Binary">lexical space</a>
+            of `xsd:base64Binary` (i.e. is it a valid base 64 string [[RFC3548]]),
+            then the JSON object is serialized as a CBOR binary string
+            (major type 2) representing the decoded value.
+          </li>
+        </ul>
+
+
+        <!--
+          TODO
+          - semantic tag for @list, @set and friends?
+          - xsd:float / xsd:double (incl. NaN, +INF...  , -0)
+          - xsd:decimal -> decimal (semantic tag)???
+          - xsd:dateType -> semantic tag (depending on actual format)
+          - @json -> encode JSON in CBOR? without the excepetions above?
+          - semantic tag for @list, @set and friends?
+          - rdf:CBOR ???
+
+        Some of them have a specific interpretation,
+        and are therefore processed differently from others.
+        <ul>
+          <li>
+            If the object is a
+            <a data-cite="JSON-LD11#dfn-value-object">value object</a>
+            with a `@type` <a>entry</a> equal to
+            `http://www.w3.org/1999/02/22-rdf-syntax-ns#CBOR`,
+            its `@value` is a valid lexical value for this datatype (see
+            <a href="#datatype"></a> below),
+            it is serialized as a map (major type 5), with two entries:
+            ...
+          </li>
+        </ul>
+        -->
+      </li>
+    </ul>
+  </section>
+  <section id="parse">
+    <h2>Parsing CBOR to JSON-LD</h2>
+    <p>
+      This section describes how to parse CBOR data into the
+      <a href="JSON-LD11#dfn-internal-representation">JSON-LD internal representation</a>,
+      following the guidelines from <a data-cite="RFC7049#section-4.1">§4.1 of RFC7049</a>.
+      It is the inverse process of the one described in
+      <a href="#serialize"></a>.
+    </p>
+    <ul>
+      <li>
+        A data item with major type 0 or 1 (positive or negative integer, respectively)
+        is parsed as the equivalent <a>number</a>.
+        If the size of this number exceeds the size supported by the implementation,
+        a parser must produce instead a <a>map</a> with two entries:
+        <ul>
+          <li>a `@type` entry whose value is `xsd:integer` (TODO full IRI),</li>
+          <li>a `@value` entry whose value is a decimal representation of the integer, as a string.</li>
+        </ul>
+        <!-- TODO or encode it as a xsd:float? -->
+      </li>
+      <li>
+        A data item with major type 2 (binary string)
+        is parsed as a <a>map</a> with two entries:
+        <ul>
+          <li>a `@type` entry whose value is `xsd:base64Binary` (TODO full IRI),</li>
+          <li>a `@value` entry whose value is the base 64 encoding of the binary string, complying with the constraints on the
+          <a data-cite="XSD#base64Binary">lexical space</a>
+          of `xsd:base64Binary`.
+          </li>
+        </ul>
+      </li>
+      <li>
+        A data item with major type 3 (text string)
+        is parsed as the equivalent <a>string</a>.
+      </li>
+      <li>
+        A data item with major type 4 (array) is parsed as an <a>array</a>,
+        whose items are parsed by recursively applying these rules to the items of the CBOR array.
+      </li>
+      <li>
+        A data item with major type 5 (map) is parsed as a <a>map</a>,
+        whose keys and values are parsed by recursively applying these rules to the items of the CBOR map.
+        Any <a>entry</a> whose key is not a <a>string</a> can not be inserted in the <a>map</a>,
+        and must therefore raise an error.
+        </ul>
+      </li>
+      <li>
+        A data item with major type 6 (semantic tag) is generally ignored;
+        its following value is simply parsed by recursively applying these rules.
+        <!-- TODO There are a few exception, however. -->
+        </ul>
+      </li>
+      <li>
+        A data item with major type 7 (primitive) is parsed as
+        <ul>
+          <li>the <a>boolean</a> value `false` if the additional type value is 20,</li>
+          <li>the <a>boolean</a> value `true` if the additional type value is 21,</li>
+          <li>the <a>null</a> if the additional type value is 22.</li>
+          <li>if the additional type value is 24,
+          25 or 26 (floating point number),
+            <ul>
+              <li>
+                if the value is finite,
+                the data item is parsed as the corresponding <a>number</a>;
+              </li>
+              <li>
+                otherwise the data item represents either <i>NaN</i>,
+                positive infinity or negative infinity;
+                it is serialized as a <a>map</a> with two entries:
+                <ul>
+                  <li>
+                    a `@type` entry whose value is `xsd:double` (TODO full IRI),
+                  </li>
+                  <li>
+                    a `@value` entry whose value is the <a>string</a> `NaN`, `INF` or `-INF`, respectively.
+                    <!-- TODO -O as well? -->
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+          <li>the corresponding floating point <a>number</a> if the additional type value is 24,
+            25 or 26 and its value is neither `NaN`, positive infinity nor negative infinity,</li>
+          </ul>
+        Any other additional type value must raise an error.
+        <!-- TODO or do something else?-->
+      </li>
+    </ul>
+  </section>
+  <section id="optimize">
+    <h2>CBOR-specific optimization of JSON-LD data</h2>
+    <p>TODO</p>
+    <section id="tag">
+      <h3>JSON-LD semantic tag</h3>
+      <p>TODO propose numeric aliases for keywords, and possibly often used IRIs?</p>
     </section>
-  </body>
+    <section id="tag">
+      <h3>Designing contexts for CBOR</h3>
+      <p>TODO do no alias keywords, do not use type coercion, define small prefixes, more...</p>
+    </section>
+  </section>
+  <section id="datatype">
+    <h2>The `rdf:CBOR` datatype</h2>
+    <p>
+    The intent of this datatype is to make it possible to convey CBOR data as
+    <a data-cite="RDF11-CONCEPTS#section-Graph-Literal">RDF literals</a>.
+    It is defined as a subset of
+    <a data-cite="XSD#binary64Binary">the `xsd:base64Binary` datatype</a>.
+    </p>
+
+    <p>The <code>rdf:CBOR</code> datatype is defined as follows:</p>
+
+    <dl>
+      <dt>The IRI denoting this datatype</dt>
+      <dd>is `http://www.w3.org/1999/02/22-rdf-syntax-ns#CBOR`.</dd>
+  
+      <dt>The lexical space</dt>
+      <dd>
+        is the subset of
+        <a data-cite="XSD#base64Binary">the lexical space of `xsd:base64Binary`</a>,
+        for which the lexical mapping produces well-formed CBOR data [[RFC7049]].
+      </dd>
+
+      <dt>The value space</dt>
+      <dd class="changed">
+        is the set of finite-length sequences of zero or more binary octets,
+        which are well-formed CBOR data [[RFC7049]].
+      </dd>
+
+      <dt>The lexical-to-value mapping and canonical mapping</dt>
+      <dd>
+        are the ones defined for the
+        <a data-cite="XSD#base64Binary">`xsd:base64Binary` datatype</a> [[XSD]].
+      </dd>
+    </dl>
+  </section>
+</body>
 </html>
